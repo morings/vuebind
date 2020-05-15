@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <div id="app">
+        <input type="text" id="a" v-model='name'>
+        <span id="b">{{name}}</span>
+    </div>
+</body>
+<script>
+    var dom = document.getElementById('app');
+    function nodeToFragment(node,vm){
+        let fragment = document.createDocumentFragment();
+        let child;
+        while(child = node.firstChild){
+            compile(child,vm)
+            fragment.append(child)
+        }
+        return fragment
+    }
+    function compile(node,vm){
+        let reg = /\{\{(.*)\}\}/;
+        if(node.nodeType==1){
+            let attr = node.attributes;
+            for(let i=0;i<attr.length;i++){
+                if(attr[i].nodeName === 'v-model'){
+                    var name = attr[i].nodeValue;
+                    node.removeAttribute('v-model');
+                    new Watch(node,vm,name)
+                    node.addEventListener('input',function(e){
+                        vm[name] = e.target.value
+                    })
+                    node.value = vm[name]              
+                }
+            }
+           node.childNodes.forEach(item=>{
+            compile(item,vm)
+           })
+        }
+        if(node.nodeType==3){
+            if(reg.test(node.nodeValue)){
+                let name = RegExp.$1;
+                name = name.trim()
+                new Watch(node,vm,name)
+            }
+        }
+        
+    }
+    function defineReactive(obj,key,val){
+        var dep = new Dep()
+        Object.defineProperty(obj,key,{
+            set:(newValue)=>{
+                val = newValue;
+                dep.notify()
+            },
+            get:()=>{
+                if(Dep.target){
+                    dep.addSub(Dep.target)
+                }
+                return val;
+            }
+        })
+    }
+    function observe(obj,vm){
+        Object.keys(obj).forEach(function(key){
+            defineReactive(vm,key,obj[key])
+        })
+    }
+    function Vue(option){
+        let data = option.data;
+        this.data = data;
+        observe(this.data,this)
+        let el = option.el;
+        document.getElementById(el).appendChild(nodeToFragment( document.getElementById(el),this))
+    }
+    function Watch(node,vm,name){
+        Dep.target = this;
+        this.value = null;
+        this.node = node;
+        this.name = name;
+        this.vm = vm;
+        this.update();
+        Dep.target = null;
+    }
+    Watch.prototype.update = function(){
+        this.value = this.get()
+        this.node.nodeValue = this.value
+    }
+    Watch.prototype.get = function(){
+        return this.vm[this.name]
+    }
+    function Dep(){
+        this.sub = []
+    }
+    Dep.prototype.addSub = function(target){
+        this.sub.push(target)
+    }
+    Dep.prototype.notify = function(){
+        this.sub.forEach(item=>{
+            item.update()
+        })
+    }
+    new Vue({
+        el:'app',
+        data:{
+            name:'qcx'
+        }
+    })
+</script>
+</html>
